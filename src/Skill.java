@@ -6,6 +6,7 @@ public class Skill {
     private int value; // Cât damage dă (sau cât vindecă)
     private String type; // "PHYSICAL", "MAGICAL", "HEAL"
 
+
     public Skill(String name, String description, int manaCost, int staminaCost, int value, String type) {
         this.name = name;
         this.description = description;
@@ -22,4 +23,10 @@ public class Skill {
     public int getStaminaCost() { return staminaCost; }
     public int getValue() { return value; }
     public String getType() { return type; }
+
+    // Metoda toString ajută la debug sau afișare simplă
+    @Override
+    public String toString() {
+        return name;
+    }
 }

@@ -25,25 +25,33 @@ public abstract class GameEntity {
 
     // Metoda pentru a primi daune
     public void takeDamage(int rawDamage) {
-        //  Se creeaza rata de reducere a daunelor (%)
-        double damageReductionRate = this.activeDefense / 100.0;
-        // Evitam vindecarea prin depasirea apararii (ex:110%)
-        if(damageReductionRate > 0.95) {
-            damageReductionRate = 0.90;
+        // --- FORMULA NOUĂ: Diminishing Returns ---
+        // Formula: 100 / (100 + Armură).
+        // 0 Armură -> 1.0 (100% dmg primit)
+        // 50 Armură -> 0.66 (66% dmg primit)
+        // 100 Armură -> 0.50 (50% dmg primit)
+
+        // Folosim 100.0 pentru a forța calculul cu zecimale (double)
+        double defenseMultiplier = 100.0 / (100.0 + (double)this.activeDefense);
+
+        // Calculăm dauna finală
+        int damageTaken = (int) (rawDamage * defenseMultiplier);
+
+        // REGULA DE AUR: Asigurăm minim 1 damage (ca să nu fii invincibil la atacuri slabe)
+        if (damageTaken < 1 && rawDamage > 0) {
+            damageTaken = 1;
         }
-        // Se calculeaza dauna finala dupa reducere
-        double finalDamageDouble = rawDamage * (1 - damageReductionRate);
-        // Se rotunjeste dauna finala (INT)
-        int damageTaken = (int) Math.round(finalDamageDouble);
-        // Se scad punctele de viata
+
+        // Se scad punctele de viață
         this.healthPoints -= damageTaken;
-        // Verificam daca punctele de viata au scazut sub 0
+
+        // Verificăm viața (să nu fie negativă)
         if(this.healthPoints <= 0) {
             this.healthPoints = 0;
-            System.out.println(this.name + " has been defeated!");
+            System.out.println(this.name + " a fost învins!");
         } else {
-            System.out.println(this.name + " takes " + damageTaken + " damage, remaining HP: " + this.healthPoints);}
-        
+            System.out.println(this.name + " primește " + damageTaken + " daune (Redus de la " + rawDamage + "). HP rămas: " + this.healthPoints);
+        }
     }
 
     public int getActiveStrength() {

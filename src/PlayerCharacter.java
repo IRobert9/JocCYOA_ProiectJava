@@ -13,6 +13,8 @@ public abstract class PlayerCharacter extends GameEntity {
     protected String trait;
     protected int skillPoints;
 
+    private ArrayList<Skill> knownSkills;    // Toate abilitățile învățate (Cartea de vrăji)
+    private ArrayList<Skill> equippedSkills; // Doar cele active în luptă (Max 5)
     //2. Sloturi de echipament
     //2.1. Arme si scut
     protected Equipment equippedMainhand;
@@ -39,13 +41,71 @@ public abstract class PlayerCharacter extends GameEntity {
 
         this.inventory = new ArrayList<>();
         this.skills = new ArrayList<>();
+
+        // Inițializăm listele
+        this.knownSkills = new ArrayList<>();
+        this.equippedSkills = new ArrayList<>();
+
+        // --- REGULA DE AUR: Atacul de Bază e mereu învățat și echipat ---
+        Skill basicAttack = new Skill("Atac de Bază", "Lovitură simplă", 0, 0, 5, "PHYSICAL");
+        this.knownSkills.add(basicAttack);
+        this.equippedSkills.add(basicAttack);
     }
 
 
     // --- 3. METODĂ NOUĂ PENTRU A ÎNVĂȚA SKILL-URI ---
     public void learnSkill(Skill newSkill) {
-        this.skills.add(newSkill);
-        System.out.println(this.name + " a învățat abilitatea: " + newSkill.getName());
+        // Verificăm dacă îl știm deja ca să nu avem duplicate
+        for(Skill s : knownSkills) {
+            if(s.getName().equals(newSkill.getName())) {
+                System.out.println("Deja cunoști abilitatea: " + newSkill.getName());
+                return;
+            }
+        }
+
+        this.knownSkills.add(newSkill);
+        System.out.println("Ai învățat o nouă abilitate: " + newSkill.getName());
+
+        // AUTO-ECHIPARE: Dacă ai loc liber pe bară, îl punem direct!
+        if (equippedSkills.size() < 5) {
+            equipSkill(newSkill);
+        }
+    }
+
+    // 2. ECHIPARE (Mută din "Known" în "Equipped")
+    public boolean equipSkill(Skill skill) {
+        // Nu poți echipa ce nu știi
+        if (!knownSkills.contains(skill)) {
+            System.out.println("Eroare: Nu cunoști abilitatea " + skill.getName());
+            return false;
+        }
+
+        // Nu poți avea mai mult de 5
+        if (equippedSkills.size() >= 5) {
+            System.out.println("Sloturi pline! Scoate o abilitate înainte să adaugi alta.");
+            return false;
+        }
+
+        // Nu poți echipa de două ori același skill
+        if (equippedSkills.contains(skill)) {
+            System.out.println("Este deja echipată.");
+            return false;
+        }
+
+        equippedSkills.add(skill);
+        System.out.println("Ai echipat: " + skill.getName());
+        return true;
+    }
+
+    // 3. DEZECHIPARE (Scoate din luptă, dar rămâne învățat)
+    public void unequipSkill(Skill skill) {
+        if (skill.getName().equals("Atac de Bază")) {
+            System.out.println("Nu poți scoate Atacul de Bază!");
+            return;
+        }
+        if (equippedSkills.remove(skill)) {
+            System.out.println("Ai dezechipat: " + skill.getName());
+        }
     }
 
     public ArrayList<Skill> getSkills() {
@@ -300,6 +360,9 @@ public abstract class PlayerCharacter extends GameEntity {
     // Metodă pentru a primi aur
     public void addGold(int amount) {
         this.gold += amount;
+        if (this.gold < 0) {
+            this.gold = 0; // Prevent negative gold
+        }
     }
 
     // --- (METODĂ NOUĂ) Pentru a cheltui puncte de skill ---
@@ -454,4 +517,8 @@ public abstract class PlayerCharacter extends GameEntity {
     public void setActiveSpeed(int spd) { this.activeSpeed = spd; }
 
     public void setSkillPoints(int points) { this.skillPoints = points; }
+
+    // Getters pentru a accesa listele din exterior
+    public ArrayList<Skill> getKnownSkills() { return knownSkills; }
+    public ArrayList<Skill> getEquippedSkills() { return equippedSkills; }
 }

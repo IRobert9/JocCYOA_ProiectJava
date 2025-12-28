@@ -34,4 +34,10 @@ public class Potion extends Item  {
         }
         target.removeItem(this); // Eliminam potiunea din inventar dupa utilizare
     }
+
+    // In Potion.java, add these getters:
+    public String getEffectType() { return this.effectType; }
+    public int getEffectValue() { return this.effectValue; }
+
+
 }

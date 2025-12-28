@@ -46,10 +46,8 @@ public class JocRPG extends Application {
 
 
     public static void main(String[] args) {
-        // --- TEST BAZĂ DE DATE ---
         DatabaseManager.createNewDatabase();
-        // -------------------------
-
+        DatabaseManager.addInventoryColumn(); // ← ADD THIS
         launch(args);
     }
 
@@ -368,7 +366,12 @@ public class JocRPG extends Application {
             Button useButton = createContinueButton("Folosește");
             useButton.setOnAction(e -> {
                 item.useItem(jucator); // Poțiunea va fi consumată
-                refreshInventoryList(itemsBox, lastLocation, popupStage); // Ne întoarcem la listă
+
+                // Close the popup to refresh stats
+                popupStage.close();
+
+                // Reopen inventory to show updated stats
+                showInventoryScreen(lastLocation);
             });
             itemsBox.getChildren().add(useButton);
         }
@@ -575,10 +578,26 @@ public class JocRPG extends Application {
         Button confirmButton = createContinueButton("Confirmă");
 
         confirmButton.setOnAction(e -> {
-            numeJucator = nameInput.getText();
+            numeJucator = nameInput.getText().trim();
+                // ↑ REMOVES leading/trailing spaces
+                // "   John   " becomes "John"
+
             if (numeJucator.isEmpty()) {
+                // NOW this catches "   " (spaces only)
                 numeJucator = "Necunoscutul";
             }
+
+                // Length limit
+            if (numeJucator.length() > 20) {
+                numeJucator = numeJucator.substring(0, 20);
+                // "VeryVeryVeryLongName123456" becomes "VeryVeryVeryLongName"
+            }
+
+                // Remove dangerous characters
+            numeJucator = numeJucator.replaceAll("[^a-zA-ZăâîșțĂÂÎȘȚ0-9 ]", "");
+                // ↑ This regex means: "Keep ONLY letters, Romanian chars, numbers, and spaces"
+                // "John<script>" becomes "Johnscript"
+                // "Player💀123" becomes "Player123"
 
             RadioButton selectedTrait = (RadioButton) traitGroup.getSelectedToggle();
             trasaturaJucator = selectedTrait.getUserData().toString();
@@ -787,9 +806,10 @@ public class JocRPG extends Application {
         // LOCAȚIA 0: Satul (Punctul de start)
         ArrayList<String> options0 = new ArrayList<>(Arrays.asList(
                 "1. Mergi spre pădurea de la marginea satului.",
-                "2. Mergi spre primăria incendiată."
+                "2. Mergi spre primăria incendiată.",
+                "3. Vorbește cu negustorul de lângă fântână."  // NEW!
         ));
-        ArrayList<Integer> links0 = new ArrayList<>(Arrays.asList(1, 2));
+        ArrayList<Integer> links0 = new ArrayList<>(Arrays.asList(1, 2, 10));  // Added 10
         Location loc0 = new Location(0,
                 "Ești în piața centrală din \"Valea Iepurelui\". Mirosul de cenușă este peste tot. Fum se ridică dinspre primărie. Majoritatea sătenilor au fugit sau... s-au transformat. Ești singur.",
                 options0, links0
@@ -798,9 +818,10 @@ public class JocRPG extends Application {
         // LOCAȚIA 1: Intrarea în Pădure
         ArrayList<String> options1 = new ArrayList<>(Arrays.asList(
                 "1. Urmează cărarea spre nord.",
-                "2. Întoarce-te în sat."
+                "2. Mergi mai adânc în pădure spre est.",
+                "3. Întoarce-te în sat."
         ));
-        ArrayList<Integer> links1 = new ArrayList<>(Arrays.asList(3, 0)); // Link spre loc 3 și 0
+        ArrayList<Integer> links1 = new ArrayList<>(Arrays.asList(3, 4, 0)); // Link spre loc 3, 4 și 0
         Location loc1 = new Location(1,
                 "Ai ajuns la marginea pădurii. Copacii par bolnavi, acoperiți de o mâzgă cenușie. O cărare abia vizibilă se afundă în întuneric.",
                 options1, links1
@@ -826,6 +847,112 @@ public class JocRPG extends Application {
                 "Mergi pe cărare când, deodată, un sunet gutural se aude din tufișuri. O Bestie Cenușie, un fost lup, cu ochii roșii și blana plină de țepi de os, îți blochează calea!",
                 options3, links3
         );
+        // ==========================================
+// LOCATION 4: Deeper Forest
+// ==========================================
+        ArrayList<String> options4 = new ArrayList<>(Arrays.asList(
+                "1. Investighezi urmele de sânge pe cărare.",
+                "2. Te întorci la intrarea în pădure."
+        ));
+        ArrayList<Integer> links4 = new ArrayList<>(Arrays.asList(5, 1));
+        Location loc4 = new Location(4,
+                "Mergi mai adânc în pădure. Copacii devin mai înalți, mai întunecoși. " +
+                        "Auzi un sunet ciudat - ca un șoapte în limbi uitate. " +
+                        "Pe pământ vezi urme proaspete... ceva mare a trecut pe aici.",
+                options4, links4
+        );
+
+// ==========================================
+// LOCATION 5: Cave Entrance
+// ==========================================
+        ArrayList<String> options5 = new ArrayList<>(Arrays.asList(
+                "1. Intri în peșteră (cu prudență).",
+                "2. Te întorci înapoi spre pădure."
+        ));
+        ArrayList<Integer> links5 = new ArrayList<>(Arrays.asList(6, 4));
+        Location loc5 = new Location(5,
+                "Descoperi intrarea într-o peșteră. Dinăuntru vine un miros de putregai și... aur? " +
+                        "Torțele pe pereți încă ard - cineva a fost aici recent. Sau ceva.",
+                options5, links5
+        );
+
+// ==========================================
+// LOCATION 6: Inside Cave - GOBLIN FIGHT
+// ==========================================
+        ArrayList<String> options6 = new ArrayList<>(Arrays.asList(
+                "1. ATACĂ goblinul!",
+                "2. Încearcă să fugi înapoi."
+        ));
+        ArrayList<Integer> links6 = new ArrayList<>(Arrays.asList(9002, 5)); // 9002 = goblin fight
+        Location loc6 = new Location(6,
+                "Intri în peșteră și... CLANGG! O capcană se închide în spatele tău! " +
+                        "Din întuneric aude râsete ciudate. Un Goblin Corupt, cu ochi galbeni și dinți putreziți, " +
+                        "țopăie spre tine cu o secure ruginită!",
+                options6, links6
+        );
+
+// ==========================================
+// LOCATION 7: Ancient Altar - BOSS FIGHT
+// ==========================================
+        ArrayList<String> options7 = new ArrayList<>(Arrays.asList(
+                "1. Atinge altarul (cercetează-l).",
+                "2. Pleacă din peșteră rapid."
+        ));
+        ArrayList<Integer> links7 = new ArrayList<>(Arrays.asList(8, 5));
+        Location loc7 = new Location(7,
+                "Învingi goblinul și ajungi într-o cameră largă. În centru, un altar de piatră neagră. " +
+                        "Pe el, o carte veche pulsează cu lumină cenușie. Simți cum nestemata de la gât vibrează...",
+                options7, links7
+        );
+
+// ==========================================
+// LOCATION 8: Boss Awakening
+// ==========================================
+        ArrayList<String> options8 = new ArrayList<>(Arrays.asList(
+                "1. LUPTĂ cu Gardianul Corupt!"
+        ));
+        ArrayList<Integer> links8 = new ArrayList<>(Arrays.asList(9003)); // 9003 = boss fight
+        Location loc8 = new Location(8,
+                "Atingi cartea și... BOOOM! Pământul se cutremură! " +
+                        "Din pereți iese un Gardian Antic Corupt - un golem de 3 metri, făcut din piatră și molimă. " +
+                        "Ochii lui roșii te privesc fix: \"INTRUS... VEI... MURI...\"",
+                options8, links8
+        );
+
+// ==========================================
+// LOCATION 10: Merchant (Shop)
+// ==========================================
+        ArrayList<String> options10 = new ArrayList<>(Arrays.asList(
+                "1. Cumpără Poțiune Mică de Viață - 10 aur (vindecă 30 HP)",
+                "2. Cumpără Poțiune Mare de Viață - 50 aur (vindecă 100 HP)",
+                "3. Cumpără Sabie de Oțel - 75 aur (+5 Forță)",
+                "4. Înapoi în sat."
+        ));
+        ArrayList<Integer> links10 = new ArrayList<>(Arrays.asList(9010, 9011, 9012, 0));
+        Location loc10 = new Location(10,
+                "Lângă fântâna din sat găsești un negustor bătrân cu căruța plină de mărfuri. " +
+                        "\"Bine ai venit, tinerele! Am poțiuni, arme... tot ce-ți trebuie pentru supraviețuire. " +
+                        "Aurul tău e bun aici!\" *zâmbește cu un dinte de aur*",
+                options10, links10
+        );
+        // ==========================================
+// LOCATION 9: Victory / End of Demo
+// ==========================================
+        ArrayList<String> options9 = new ArrayList<>(Arrays.asList(
+                "1. Ia cartea de pe altar.",
+                "2. Întoarce-te în sat să te vindeci."
+        ));
+        ArrayList<Integer> links9 = new ArrayList<>(Arrays.asList(99, 0)); // 99 = "You win" screen
+        Location loc9 = new Location(9,
+                "Gardianul se prăbușește într-un nor de cenușă. Molima se retrage din cameră. " +
+                        "Altarul strălucește curat acum. Cartea de pe el poartă simboluri vechi... " +
+                        "Nestemata ta o recunoaște cumva. Simți că aceasta este doar ÎNCEPUTUL.",
+                options9, links9
+        );
+
+// ==========================================
+// ADD ALL NEW LOCATIONS TO MAP
+// ==========================================
 
 
         // Adăugăm locațiile create în Harta lumii
@@ -833,8 +960,15 @@ public class JocRPG extends Application {
         worldMap.put(loc1.getID(), loc1);
         worldMap.put(loc2.getID(), loc2);
         worldMap.put(loc3.getID(), loc3);
+        worldMap.put(loc4.getID(), loc4);
+        worldMap.put(loc5.getID(), loc5);
+        worldMap.put(loc6.getID(), loc6);
+        worldMap.put(loc7.getID(), loc7);
+        worldMap.put(loc8.getID(), loc8);
+        worldMap.put(loc9.getID(), loc9);
+        worldMap.put(loc10.getID(), loc10);
     }
-
+    private int lastSafeLocationId = 0;
     // --- (METODĂ NOUĂ) ECRANUL PRINCIPAL DE JOC ---
     private void showGameScreen(Location currentLocation) {
         fereastraPrincipala.setTitle("Regatul Cenușiu - " + currentLocation.getDescription().substring(0, 20) + "...");
@@ -898,15 +1032,92 @@ public class JocRPG extends Application {
                             10,           // goldReward
                             0, 0          // dropReward (ignorăm deocamdată)
                     );
+
                     System.out.println("Un " + currentEnemy.getName() + " apare!");
 
                     // 2. Apelăm noul ecran de luptă
                     // Îi spunem unde să se întoarcă DUPĂ luptă (Locația 1)
                     showBattleScreen(1);
 
-                } else {
-                    // Logică normală de navigare
+                } else if (nextLocationID == 9002) {
+                    this.currentEnemy = new Enemy(
+                            "Goblin Corupt",  // Name
+                            70,               // HP - stronger than wolf
+                            6,                // Defense
+                            14,               // Speed - faster!
+                            10,               // Strength
+                            0,                // Intelligence
+                            75,               // XP reward
+                            25,               // Gold reward
+                            0, 0
+                    );
+                    System.out.println("⚔️ Un " + currentEnemy.getName() + " te atacă!");
+                    showBattleScreen(7); // Return to altar room after victory
+                }
+
+// ==========================================
+// BOSS FIGHT (Location 8)
+// ==========================================
+                else if (nextLocationID == 9003) {
+                    this.currentEnemy = new Enemy(
+                            "Gardian Antic Corupt",  // Name
+                            200,              // HP - BOSS health!
+                            15,               // Defense - very tanky
+                            8,                // Speed - slow but deadly
+                            18,               // Strength - hits HARD
+                            0,                // Intelligence
+                            300,              // XP reward - big!
+                            100,              // Gold reward
+                            0, 0
+                    );
+                    System.out.println("💀 BOSS FIGHT: " + currentEnemy.getName() + "!");
+                    showBattleScreen(9); // We'll create victory location 9
+                }
+                // ADD THIS in the button action handler:
+                else if (nextLocationID == 9010) {
+                    // BUY SMALL POTION
+                    if (jucator.getGold() >= 10) {
+                        jucator.addGold(-10);
+                        Potion potion = new Potion("Poțiune Mică de Viață",
+                                "Vindecă 30 HP", 10, "HP", 30);
+                        jucator.addItem(potion);
+                        System.out.println("✅ Ai cumpărat o Poțiune Mică!");
+                    } else {
+                        System.out.println("❌ Nu ai destui bani! (Ai " + jucator.getGold() + " aur)");
+                    }
+                    showGameScreen(worldMap.get(10)); // Stay at shop
+
+                } else if (nextLocationID == 9011) {
+                    // BUY LARGE POTION
+                    if (jucator.getGold() >= 50) {
+                        jucator.addGold(-50);
+                        Potion potion = new Potion("Poțiune Mare de Viață",
+                                "Vindecă 100 HP", 50, "HP", 100);
+                        jucator.addItem(potion);
+                        System.out.println("✅ Ai cumpărat o Poțiune Mare!");
+                    } else {
+                        System.out.println("❌ Nu ai destui bani! (Ai " + jucator.getGold() + " aur)");
+                    }
+                    showGameScreen(worldMap.get(10));
+
+                } else if (nextLocationID == 9012) {
+                    // BUY STEEL SWORD
+                    if (jucator.getGold() >= 75) {
+                        jucator.addGold(-75);
+                        Equipment sword = new Equipment("Sabie de Oțel",
+                                "O armă bine forjată", 75,
+                                "MAINHAND", "ONE_HANDED",
+                                0, 0, 0, 5, 0, 0, 0); // +5 Strength!
+                        jucator.addItem(sword);
+                        System.out.println("✅ Ai cumpărat o Sabie de Oțel!");
+                    } else {
+                        System.out.println("❌ Nu ai destui bani! (Ai " + jucator.getGold() + " aur)");
+                    }
+                    showGameScreen(worldMap.get(10));
+                }else {
+                    // Normal location change
                     Location nextLocation = worldMap.get(nextLocationID);
+                    this.lastSafeLocationId = nextLocation.getID(); // Save last safe location
                     showGameScreen(nextLocation);
                 }
             });
@@ -945,7 +1156,7 @@ public class JocRPG extends Application {
         root.setStyle("-fx-background-color: #3B1212;"); // Fundal roșu-închis
         root.setPadding(new Insets(15));
 
-        // Jurnalul
+        // 1. Jurnalul de luptă (Centru)
         TextArea battleLog = new TextArea();
         battleLog.setEditable(false);
         battleLog.setFont(new Font("Monospaced", 14));
@@ -953,17 +1164,17 @@ public class JocRPG extends Application {
         battleLog.setText("Lupta a început! Un " + currentEnemy.getName() + " se uită la tine!\n");
         root.setCenter(battleLog);
 
-        // Statistici Inamic (Sus)
+        // 2. Statistici Inamic (Sus)
         Label enemyLabel = createNaratorLabel(
                 currentEnemy.getName() + "\nHP: " + currentEnemy.getHealthPoints() + " / " + currentEnemy.getMaxHealth()
         );
         root.setTop(enemyLabel);
 
-        // Container pentru butoane (Jos)
+        // 3. Zona de Acțiuni (Jos)
         VBox actionsBox = new VBox(10);
         actionsBox.setAlignment(Pos.CENTER);
 
-        // Statistici Jucător
+        // A. Statistici Jucător (Le punem primele, să le vezi înainte să ataci)
         Label playerStats = createNaratorLabel(String.format(
                 "HP: %d/%d | Mana: %d/%d | Stamina: %d/%d",
                 jucator.getHealthPoints(), jucator.getMaxHealth(),
@@ -971,34 +1182,31 @@ public class JocRPG extends Application {
                 jucator.getActiveStamina(), jucator.getBaseStamina()
         ));
         playerStats.setFont(new Font("Arial", 16));
+        playerStats.setStyle("-fx-text-fill: #FFFFFF; -fx-font-weight: bold;");
         actionsBox.getChildren().add(playerStats);
 
-        // --- GENERAREA DINAMICĂ A BUTOANELOR DE SKILL ---
-        // Aici este marea schimbare!
-        for (Skill skill : jucator.getSkills()) {
+        // B. Generarea Butoanelor pentru Skill-urile ECHIPATE
+        // Iterăm DOAR prin getEquippedSkills()
+        for (Skill skill : jucator.getEquippedSkills()) {
 
-            // Calculăm textul butonului (Nume + Cost)
-            String buttonText = skill.getName();
-            if (skill.getManaCost() > 0) {
-                buttonText += " (" + skill.getManaCost() + " Mana)";
-            }
-            if (skill.getStaminaCost() > 0) {
-                buttonText += " (" + skill.getStaminaCost() + " Stamina)";
-            }
+            // Textul butonului: Nume + Cost
+            String btnText = skill.getName();
+            if (skill.getManaCost() > 0) btnText += " (" + skill.getManaCost() + " MP)";
+            if (skill.getStaminaCost() > 0) btnText += " (" + skill.getStaminaCost() + " STA)";
 
-            Button skillButton = createContinueButton(buttonText);
+            Button skillBtn = createContinueButton(btnText);
 
-            // Acțiunea butonului: Execută skill-ul specific
-            skillButton.setOnAction(e -> {
+            // Acțiunea butonului
+            skillBtn.setOnAction(e -> {
                 executeSkillTurn(skill, battleLog, victoryLocationId);
             });
 
-            actionsBox.getChildren().add(skillButton);
+            actionsBox.getChildren().add(skillBtn);
         }
-        // -------------------------------------------------
 
-        // Butonul de Odihnă (rămâne fix, e mereu disponibil)
+        // C. Butonul de Odihnă (Fix)
         Button restButton = createContinueButton("Odihnă (Reface resursele)");
+        restButton.setStyle("-fx-background-color: #555555; -fx-text-fill: white;"); // Îl facem puțin diferit vizual
         restButton.setOnAction(e -> {
             performRestTurn(battleLog, victoryLocationId);
         });
@@ -1037,11 +1245,25 @@ public class JocRPG extends Application {
 
         } else {
             // E atac (PHYSICAL sau MAGICAL)
-            int damage = skill.getValue();
-            // Aici am putea adăuga bonusuri din stats (ex: damage + strenght)
-            // Deocamdată folosim valoarea de bază a skill-ului
-            currentEnemy.takeDamage(damage);
-            log.appendText("Ai folosit " + skill.getName() + "! Inamicul ia " + damage + " daune.\n");
+            int baseDamage = skill.getValue();
+            int totalDamage = baseDamage;
+
+            // Add stat bonuses based on skill type
+            if (skill.getType().equals("PHYSICAL")) {
+                // Physical skills scale with Strength
+                int strengthBonus = jucator.getActiveStrength() * 2; // 2 damage per strength
+                totalDamage = baseDamage + strengthBonus;
+                log.appendText("[Forță bonus: +" + strengthBonus + "]\n");
+
+            } else if (skill.getType().equals("MAGICAL")) {
+                // Magical skills scale with Intelligence
+                int intelligenceBonus = jucator.getActiveInteligence() * 2; // 2 damage per intelligence
+                totalDamage = baseDamage + intelligenceBonus;
+                log.appendText("[Inteligență bonus: +" + intelligenceBonus + "]\n");
+            }
+
+            currentEnemy.takeDamage(totalDamage);
+            log.appendText("Ai folosit " + skill.getName() + "! Inamicul ia " + totalDamage + " daune.\n");
         }
 
         // 4. Verificăm Victorie/Înfrângere și Tura Inamicului
@@ -1108,7 +1330,7 @@ public class JocRPG extends Application {
         // 2. Aplicăm recompensele jucătorului
         jucator.gainExperience(xpGained);
         // (Dacă ai implementat metoda addGold în PlayerCharacter, decomentează linia de mai jos)
-        // jucator.addGold(goldGained);
+        jucator.addGold(goldGained);
 
         // 3. RECUPERARE AUTOMATĂ (AICI E SCHIMBAREA)
         // Refacem stamina și mana ca să fii gata de următoarea luptă
@@ -1243,6 +1465,14 @@ public class JocRPG extends Application {
             jucator.setActiveDefense(data.def);
             jucator.setActiveSpeed(data.spd);
 
+            if (data.inventoryJson != null && !data.inventoryJson.isEmpty()) {
+                ArrayList<Item> loadedInventory = DatabaseManager.deserializeInventory(data.inventoryJson);
+                for (Item item : loadedInventory) {
+                    jucator.addItem(item);
+                }
+                System.out.println("✅ Restored " + loadedInventory.size() + " items to inventory");
+            }
+
             // 3. Reconstruim harta lumii (ca să avem acces la locații)
             createWorldMap();
 
@@ -1298,8 +1528,8 @@ public class JocRPG extends Application {
         Button saveButton = createContinueButton("Salvează");
         saveButton.setOnAction(e -> {
             if (jucator != null) {
-                int locID = (currentEnemy != null) ? 9001 : 0;
-                DatabaseManager.saveGame(jucator, locID);
+                // FIXED: Always save the last safe location
+                DatabaseManager.saveGame(jucator, lastSafeLocationId);
                 saveButton.setText("Salvat!");
             }
         });

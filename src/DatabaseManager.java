@@ -1,4 +1,5 @@
 import java.sql.*;
+import java.util.ArrayList;
 
 public class DatabaseManager {
 
@@ -40,6 +41,7 @@ public class DatabaseManager {
                 + " speed integer,\n"
                 + " skill_points integer,\n"
                 + " location_id integer\n"
+                + " inventory_json text\n"
                 + ");";
 
         try (Connection conn = connect();
@@ -55,8 +57,8 @@ public class DatabaseManager {
     public static void saveGame(PlayerCharacter player, int locationId) {
         String sql = "INSERT OR REPLACE INTO player_save(id, name, class_type, trait, level, exp, gold, " +
                 "current_hp, max_hp, current_mana, max_mana, current_stamina, max_stamina, " +
-                "strength, intelligence, defense, speed, skill_points, location_id) " +
-                "VALUES(1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                "strength, intelligence, defense, speed, skill_points, location_id, inventory_json) " +
+                "VALUES(1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = connect();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -85,11 +87,28 @@ public class DatabaseManager {
             pstmt.setInt(17, player.getSkillPoints());
             pstmt.setInt(18, locationId);
 
+            String inventoryJson = serializeInventory(player.getInventory());
+            pstmt.setString(19, inventoryJson);
+
             pstmt.executeUpdate();
             System.out.println("💾 Joc Salvat cu Succes!");
 
         } catch (SQLException e) {
             System.out.println("❌ Eroare la salvare: " + e.getMessage());
+            e.printStackTrace();  // ← ADD THIS LINE
+        }
+    }
+
+    public static void addInventoryColumn() {
+        String sql = "ALTER TABLE player_save ADD COLUMN inventory_json text";
+
+        try (Connection conn = connect();
+             Statement stmt = conn.createStatement()) {
+            stmt.execute(sql);
+            System.out.println("✅ Added inventory_json column");
+        } catch (SQLException e) {
+            // Column might already exist, that's ok
+            System.out.println("Column already exists or error: " + e.getMessage());
         }
     }
 
@@ -101,6 +120,7 @@ public class DatabaseManager {
         public String trait;
         public int level, exp, gold, hp, maxHp, mana, maxMana, stamina, maxStamina;
         public int str, intel, def, spd, skillPoints, locationId;
+        public String inventoryJson;
     }
 
     // 5. ÎNCĂRCAREA JOCULUI
@@ -132,12 +152,134 @@ public class DatabaseManager {
                 data.spd = rs.getInt("speed");
                 data.skillPoints = rs.getInt("skill_points");
                 data.locationId = rs.getInt("location_id");
+                data.inventoryJson = rs.getString("inventory_json");
                 System.out.println("📂 Date încărcate pentru: " + data.name);
             }
 
         } catch (SQLException e) {
             System.out.println("❌ Eroare la încărcare: " + e.getMessage());
+            e.printStackTrace();  // ← ADD THIS LINE
         }
         return data;
     }
+
+    // ========================================
+// INVENTORY SERIALIZATION
+// ========================================
+
+    private static String serializeInventory(ArrayList<Item> inventory) {
+        StringBuilder json = new StringBuilder();
+        json.append("[");
+
+        for (int i = 0; i < inventory.size(); i++) {
+            Item item = inventory.get(i);
+
+            if (item instanceof Equipment) {
+                Equipment eq = (Equipment) item;
+                json.append("{\"type\":\"equipment\",");
+                json.append("\"name\":\"").append(escapeJson(eq.getName())).append("\",");
+                json.append("\"desc\":\"").append(escapeJson(eq.getDescription())).append("\",");
+                json.append("\"value\":").append(eq.getValue()).append(",");
+                json.append("\"slot\":\"").append(eq.getSlotType()).append("\",");
+                json.append("\"hand\":\"").append(eq.getHandType()).append("\",");
+                json.append("\"hp\":").append(eq.getHealthBonus()).append(",");
+                json.append("\"mana\":").append(eq.getManaBonus()).append(",");
+                json.append("\"stamina\":").append(eq.getStaminaBonus()).append(",");
+                json.append("\"str\":").append(eq.getStrengthBonus()).append(",");
+                json.append("\"int\":").append(eq.getIntelligenceBonus()).append(",");
+                json.append("\"def\":").append(eq.getDefenseBonus()).append(",");
+                json.append("\"spd\":").append(eq.getSpeedBonus());
+                json.append("}");
+
+            } else if (item instanceof Potion) {
+                Potion pot = (Potion) item;
+                json.append("{\"type\":\"potion\",");
+                json.append("\"name\":\"").append(escapeJson(pot.getName())).append("\",");
+                json.append("\"desc\":\"").append(escapeJson(pot.getDescription())).append("\",");
+                json.append("\"value\":").append(pot.getValue()).append(",");
+                json.append("\"effectType\":\"").append(pot.getEffectType()).append("\",");
+                json.append("\"effectValue\":").append(pot.getEffectValue());
+                json.append("}");
+            }
+
+            if (i < inventory.size() - 1) {
+                json.append(",");
+            }
+        }
+
+        json.append("]");
+        return json.toString();
+    }
+
+    public static ArrayList<Item> deserializeInventory(String json) {
+        ArrayList<Item> inventory = new ArrayList<>();
+
+        if (json == null || json.trim().isEmpty() || json.equals("[]")) {
+            return inventory;
+        }
+
+        // Simple JSON parsing (manual, no library needed)
+        json = json.trim();
+        json = json.substring(1, json.length() - 1); // Remove [ ]
+
+        String[] items = json.split("\\},\\{");
+
+        for (String itemStr : items) {
+            itemStr = itemStr.replace("{", "").replace("}", "");
+
+            String type = extractValue(itemStr, "type");
+            String name = extractValue(itemStr, "name");
+            String desc = extractValue(itemStr, "desc");
+            int value = Integer.parseInt(extractValue(itemStr, "value"));
+
+            if (type.equals("equipment")) {
+                String slot = extractValue(itemStr, "slot");
+                String hand = extractValue(itemStr, "hand");
+                int hp = Integer.parseInt(extractValue(itemStr, "hp"));
+                int mana = Integer.parseInt(extractValue(itemStr, "mana"));
+                int stamina = Integer.parseInt(extractValue(itemStr, "stamina"));
+                int str = Integer.parseInt(extractValue(itemStr, "str"));
+                int intel = Integer.parseInt(extractValue(itemStr, "int"));
+                int def = Integer.parseInt(extractValue(itemStr, "def"));
+                int spd = Integer.parseInt(extractValue(itemStr, "spd"));
+
+                Equipment eq = new Equipment(name, desc, value, slot, hand, hp, mana, stamina, str, intel, def, spd);
+                inventory.add(eq);
+
+            } else if (type.equals("potion")) {
+                String effectType = extractValue(itemStr, "effectType");
+                int effectValue = Integer.parseInt(extractValue(itemStr, "effectValue"));
+
+                Potion pot = new Potion(name, desc, value, effectType, effectValue);
+                inventory.add(pot);
+            }
+        }
+
+        return inventory;
+    }
+
+    private static String extractValue(String json, String key) {
+        String searchKey = "\"" + key + "\":";
+        int startIndex = json.indexOf(searchKey);
+        if (startIndex == -1) return "";
+
+        startIndex += searchKey.length();
+
+        // Handle string values
+        if (json.charAt(startIndex) == '"') {
+            startIndex++; // Skip opening quote
+            int endIndex = json.indexOf("\"", startIndex);
+            return json.substring(startIndex, endIndex);
+        } else {
+            // Handle numeric values
+            int endIndex = json.indexOf(",", startIndex);
+            if (endIndex == -1) endIndex = json.length();
+            return json.substring(startIndex, endIndex).trim();
+        }
+    }
+
+    private static String escapeJson(String str) {
+        return str.replace("\"", "\\\"").replace("\n", "\\n");
+    }
+
 }
